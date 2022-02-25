@@ -1,24 +1,24 @@
-#!bin/bash
+#!/bin/bash
 
 let validInput=0
-if [$# < 3] 
+if (( $# < 3 )) 
 then
-    echo 2> "can't execute. Too few parameters"
-elif [$# > 3]
+    echo "can't execute. Too few parameters" >&2 
+elif (( $# > 3 ))
 then
-    echo 2> "can't execute. Too many parameters"
+    echo "can't execute. Too many parameters" >&2 
 else
     validInput=1
 fi
-if [$(find -name $2 -type d) != 0] 
+if [ ! -d "$2" ] 
 then
-    echo 2> "No such directory"
+    echo "No such directory" >&2
     validInput=0 
 fi
-if[validInput]
+if ((validInput == 1))
 then
-        find $2 -type f -name "*.$3" > $1
+        find $2 -type f -name "*.$3" -exec basename {} \; > "$1"
 else
-        echo  "correct format:sciptname <filename> <directory> <extension>" 
+        echo  "correct format: sciptname <filename> <directory> <extension>" 
 fi
 
