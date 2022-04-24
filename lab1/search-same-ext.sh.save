@@ -17,7 +17,7 @@ then
 fi
 if ((validInput == 1))
 then
-        find $2 -type f -name "*.$3" -printf '%f\n' > "$1"
+        find $2 -type f -name "*.$3" -printf "%p" ;\; > "$1"
 else
         echo  "correct format: sciptname <filename> <directory> <extension>" 
 fi

@@ -11,14 +11,15 @@ else
    # let exec=$2
     if [ -f "$1" ]
     then
-	gcc "$1" -o "$2"
-	if [ "$?" -ne 0 ]
-	then
-	    echo "successful"
-	    ./$2
-	else
-	    echo "compilation failed" >&2
-	fi
+	gcc $1 -o $2 && ./$2
+#	if [ "$?" -ne 0 ]
+#	then
+#	    echo "successful"
+#	    #chmod o+rwx $2
+#	    ./$2
+#	else
+#	    echo "compilation failed" >&2
+#	fi
     else
 	echo "source file doesn't exist" >&2
     fi

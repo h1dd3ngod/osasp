@@ -9,6 +9,7 @@ then
    echo "no such directory" >&2
    echo "aborting" >&2
 else
-    find $2 -type f -exec grep -r --regexp "$1" {} 2>/dev/null -l  \; | xargs ls -al | sort -k 5 -n | awk '{print $5, $9}'
+    #find $2 -type f -exec grep -r --regexp "$1" {} 2>/dev/null -l  \; | xargs ls -al | sort -k 5 -n | awk '{print $5, $9}'    
+    find $2 -type f -exec grep -r --regexp "$1" -l -q \; -printf '%s %p\n' | sort -n            #| sort -k 5 -n
                                                                                   #-Sr
 fi

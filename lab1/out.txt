@@ -1,3 +1,2 @@
-hello_linux.c
-bufferutil.c
-validation.c
+args-passed.txt
+out.txt

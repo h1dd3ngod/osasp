@@ -1,4 +1,4 @@
 #!/bin/bash
 echo args: $@
-echo $@ > args-passed.txt
+echo $@>args-passed.txt
 
