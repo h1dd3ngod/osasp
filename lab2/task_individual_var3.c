@@ -105,6 +105,8 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    //if (argv[3] == "size") ... else if (argv[3] == "date") 
+
     resFile = fopen(argv[2], "w");
     if (resFile == NULL)
     {

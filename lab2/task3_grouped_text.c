@@ -4,6 +4,21 @@
 
 #define EXIT_ON_ERROR -1
 
+int checkIfValidInt(const char* str, int* toInt) {
+    char* errChar;
+    *toInt = (int)strtol(str, &errChar, 10);
+    if (errno != 0 || *toInt < 0)
+    {
+        fprintf(stderr, "Wrong value of second parameter %s\n", str);
+        return EXIT_ON_ERROR;
+    }
+    if (*errChar != '\0' || errChar == str) {
+        fprintf(stderr, "wrong char encountered\n");
+        return EXIT_ON_ERROR;
+    }
+    return EXIT_SUCCESS;
+}
+
 int main(int argc, char *argv[])
 {
     if (argc != 3)
@@ -11,12 +26,9 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Unsuitable parameter composition\nProper format: %s <filename> <numberOfLinesPerGroup>\n", argv[0]);
         return 0;
     }
-    int linesPerGroup = (int)strtol(argv[2], NULL, 10);
-    if ((errno != 0) || (linesPerGroup < 0))
-    {
-        fprintf(stderr, "Wrong value of second parameter %s\n", argv[2]);
-        return EXIT_ON_ERROR;
-    }
+    int linesPerGroup;
+    if (checkIfValidInt(argv[2], &linesPerGroup)) return EXIT_ON_ERROR;
+
     FILE *fileToRead = fopen(argv[1], "r");
     if (fileToRead == NULL)
     {
