@@ -31,8 +31,10 @@ int main()
         if (errno) return errorCreatingProcess();
     }
     printProcInfo();
-    if (subProc)
+    if (subProc) {
         system("ps -x ");
+        while (wait(NULL)!=-1); //wait until no children
+    }
     else
         return 0;
     return 0;
