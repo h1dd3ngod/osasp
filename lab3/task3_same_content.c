@@ -55,7 +55,7 @@ int checkIfValidInt(const char *str, int *toInt)
     return EXIT_SUCCESS;
 }
 
-char srcDir[PATH_MAX];
+char srcPath[PATH_MAX];
 int srcLen;
 char destDir[PATH_MAX];
 int destLen;
@@ -65,6 +65,7 @@ int procCounter;
 void printProcInfo(pid_t pid, const char *src, const char *dest, long size, const char *compared)
 {
     printf("Current active process number: %d, Process id: %d, Src file name: %s, Dest file name: %s, Size: %ld, Result: %s\n", procCounter, pid, src, dest, size, compared);
+    // printf("---------------------------------------------------------------------------------------------------------------------------------\n");
 }
 
 // Main task core functions
@@ -104,10 +105,8 @@ void compareFilesAndPrint(char *srcName, char *destName)
     char comparisonRes[50];
     if (srcFileSize > destFileSize)
         printProcInfo(getpid(), srcName, destName, srcFileSize, "Source file is larger");
-    // strcpy(comparisonRes, "Source file is larger");
     else if (destFileSize > srcFileSize)
         printProcInfo(getpid(), srcName, destName, destFileSize, "Source file is smaller");
-    // strcpy(comparisonRes, "Source file is smaller");
     else
     {
         char nextCharSrc, nextCharDest;
@@ -117,10 +116,8 @@ void compareFilesAndPrint(char *srcName, char *destName)
                 differentContent = 1;
         if (differentContent)
             printProcInfo(getpid(), srcName, destName, destFileSize, "Files are the same size");
-        // strcpy(comparisonRes, "Files are the same size");
         else
             printProcInfo(getpid(), srcName, destName, destFileSize, "Files are EQUAL");
-        // strcpy(comparisonRes, "Files are EQUAL");
     }
 
     if (fclose(srcDirFile))
@@ -157,18 +154,17 @@ void createThreadCompareFiles(char *srcName, char *destName)
 void enterSelf()
 {
     struct stat st;
-    if (stat(srcDir, &st))
+    if (stat(srcPath, &st))
     {
-        fprintf(stderr, "File/src (%s) can't be read.\n", srcDir);
+        fprintf(stderr, "File/src (%s) can't be read.\n", srcPath);
         return;
     }
     if (isDirectory(&st))
     {
-        // mkdir(destDir, st.st_mode);
-        DIR *dirPtr = opendir(srcDir);
+        DIR *dirPtr = opendir(srcPath);
         if (!dirPtr)
         {
-            fprintf(stderr, "Can't open directory %s!\n", srcDir);
+            fprintf(stderr, "Can't open directory %s!\n", srcPath);
             return;
         }
 
@@ -183,32 +179,54 @@ void enterSelf()
                 int oldDirLen = srcLen;
                 int oldDestLen = destLen;
 
-                strcat(srcDir, "/");
-                strcat(srcDir, destName);
+                strcat(srcPath, "/");
+                strcat(srcPath, destName);
                 srcLen += 1 + destNameLen;
-
-                strcat(destDir, "/");
-                strcat(destDir, destName);
-                destLen += 1 + destNameLen;
 
                 enterSelf();
 
                 srcLen -= 1 + destNameLen;
-                destLen -= 1 + destNameLen;
-                srcDir[oldDirLen] = '\0';
-                destDir[oldDestLen] = '\0';
+                srcPath[oldDirLen] = '\0';
             }
         }
 
         if (closedir(dirPtr))
         {
-            fprintf(stderr, "Can't close directory %s!\n", srcDir);
+            fprintf(stderr, "Can't close directory %s!\n", srcPath);
             return;
         }
     }
     else
     {
-        createThreadCompareFiles(srcDir, destDir);
+        DIR *destDirPtr = opendir(destDir);
+        if (!destDirPtr)
+        {
+            fprintf(stderr, "Can't open the destined for directory %s!\n", destDir);
+            return;
+        }
+        struct dirent *destFile;
+        while ((destFile = readdir(destDirPtr)))
+        {
+            char currFileName[PATH_MAX];
+            strcpy(currFileName, destDir);
+            strcat(currFileName, "/");
+            strcat(currFileName, destFile->d_name);
+
+            struct stat fileState;
+            if (stat(currFileName, &fileState))
+            {
+                fprintf(stderr, "Dest file (%s) can't be read.\n", destDir);
+                return;
+            }
+
+            if (!isDirectory(&fileState))
+                createThreadCompareFiles(srcPath, currFileName);
+        }
+        if (closedir(destDirPtr))
+        {
+            fprintf(stderr, "Can't close directory %s!\n", destDir);
+            return;
+        }
     }
 }
 
@@ -220,18 +238,16 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Proper format: <Source folder> <Destination folder> <N(Max count of processes)>\n");
         return EXIT_FAILURE;
     }
-
-    strcpy(srcDir, argv[1]);
+    strcpy(srcPath, argv[1]);
     strcpy(destDir, argv[2]);
     if (checkIfValidInt(argv[3], &N))
         return EXIT_FAILURE;
-    srcLen = strlen(srcDir);
+    srcLen = strlen(srcPath);
     destLen = strlen(destDir);
 
     enterSelf();
 
-    while (wait(NULL) != -1)
-        ;
+    while (wait(NULL) != -1);
     // upon completion of all concurrent processes
     return EXIT_SUCCESS;
 }
