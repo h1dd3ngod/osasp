@@ -21,8 +21,8 @@
 typedef struct Node {
 	int val;
 	struct Node *cn[CHILD_COUNT];
-	int signal; // -1 - no signal
-	int signal2; // -1 - no signal
+	int signal; 
+	int signal2; 
 	sigset_t *sigset;
 } Node;
 
@@ -75,8 +75,8 @@ void signalHandler(int sig, siginfo_t *siginfo, void *code) {
 		       usr2_count_snd);
 		exit(0);
 	}
-//	printf("USR1 count: %d\n", usr1_count_rec);
-//	printf("USR2 count: %d\n", usr2_count_rec);
+
+
 	if (curNode->val==1) {
 		usr2_count_snd++;
 		sleep(1);
@@ -197,7 +197,7 @@ pid_t forkProcess(Node *n) {
 		case -1: perror("Error: fork failed\n");
 			break;
 		case 0:
-			// for child process
+			
 			printf("Forked process %d(%d) from %d(%d)\n", getpid(), n->val, getppid(), curNode->val);
 			curNode = n;
 			savePid(curNode->val, getpid());
@@ -205,7 +205,7 @@ pid_t forkProcess(Node *n) {
 
 			return 0;
 		default:
-			// for parent process
+			
 			return pid;
 	}
 }
@@ -219,21 +219,16 @@ void createProcessTree(Node *root) {
 	curNode = root;
 	for (int i = 0; i < CHILD_COUNT; ++i) {
 		struct Node *nextNode = curNode->cn[i];
-//		printf("In cycle %d\n", nextNode->val);
 		if (nextNode!=NULL && !created[nextNode->val]) {
 			char semName[255] = "/child_register_handler";
 			size_t strlen1 = strlen(semName);
 			semName[strlen1] = '0' + nextNode->val;
 			semName[strlen1 + 1] = '\0';
-//			printf("semName: %s\n", semName);
-			sem_t *childRegisterHandler = sem_open(semName, O_CREAT, 0777, 0);
 
-//			sem_init(childRegisterHandler, 1, 0);
+			sem_t *childRegisterHandler = sem_open(semName, O_CREAT, 0777, 0);
 			pid_t pid = forkProcess(nextNode);
-//			printf("Creating process tree for %d\n", curNode->val);
+
 			if (pid==0) {
-				// for child process //
-//				printf("Creating process tree for %d\n", curNode->val);
 				createProcessTree(curNode);
 				sem_post(childRegisterHandler);
 				printf("Curnode.val: %d\n", curNode->val);
@@ -241,34 +236,19 @@ void createProcessTree(Node *root) {
 					sendToAll(SIGUSR1);
 				}
 				while (1) { sleep(20000); }
-//				while (1){};
-//				sleep(20000);
 				printf("Exiting %d\n", curNode->val);
 				exit(0);
 			} else {
-				// for parent process //
 				sem_wait(childRegisterHandler);
 				printf("Process tree for %d created\n", nextNode->val);
-//				sem_destroy(childRegisterHandler);
-//				if (nextNode->signal!=-1 && curNode->val==1) {
-//					printf("NexNode %d\n", nextNode->val);
-//					printf("CurNode %d\n", curNode->val);
-//					printf("Killing %d\n", nextNode->val);
-//					kill(pid, SIGUSR2);
-//					printf("Killed %d\n", nextNode->val);
-//				}
-//				printf("Before continue\n");
 				continue;
 			}
 		}
 	}
-
-	// TODO: wait for all child processes check
-//	while (1){};
-//	while (wait(NULL)!=-1);
-//	printf("Finished %d\n", curNode->val);
 }
 #pragma clang diagnostic pop
+
+#define CTRL_F 6
 
 int main() {
 	Node *root = createNode(0, NULL, 0, 0);
@@ -276,7 +256,7 @@ int main() {
 	createTree(root);
 	createProcessTree(root);
 
-//	kill(-getpid(), SIGUSR2);
-	while (wait(NULL)!=-1);
+
+	while (wait(NULL)!=-1 && getc(stdin) != CTRL_F);
 	return 0;
 }
