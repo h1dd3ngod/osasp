@@ -1,262 +1,101 @@
+#include <stdlib.h>
 #include <stdio.h>
-#include <semaphore.h>
-#include <malloc.h>
+#include <limits.h>
 #include <signal.h>
 #include <sys/types.h>
-#include <sys/stat.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/time.h>
-#include <string.h>
-#include <sys/wait.h>
-#include <fcntl.h>
-#include <unistd.h>
 
-#define CHILD_COUNT 8
+#define MILISEC 1000
+#define CHILD_COUNT 2
+int messageCount = 1;
 
-typedef struct Node {
-	int val;
-	struct Node *cn[CHILD_COUNT];
-	int signal; 
-	int signal2; 
-	sigset_t *sigset;
-} Node;
+char *getCurrTime()
+{
+	struct timeval curTime;
+	if (gettimeofday(&curTime, NULL) == -1)
+	{
+		perror("An error occured when recieving time: \n");
+		return NULL;
+	}
+	int milisec = curTime.tv_usec / 1000;
 
-Node *curNode = NULL;
-int usr1_count_rec = 0;
-int usr2_count_rec = 0;
-int usr1_count_snd = 0;
-int usr2_count_snd = 0;
-
-long long getTime() {
-	struct timeval tv;
-
-	if (gettimeofday(&tv, NULL)==-1) {
-		perror("Can not get current time");
-		return -1;
+	char buffer[9];
+	if (strftime(buffer, 9, "%H:%M:%S", localtime(&curTime.tv_sec)) == 0)
+	{
+		fprintf(stderr, "Out of array bounds error");
+		return NULL;
 	}
 
-	return tv.tv_sec*1000000 + tv.tv_usec;
+	char *currentTime = malloc(sizeof(char) * 13);
+	if (sprintf(currentTime, "%s:%03d", buffer, milisec) < 0)
+	{
+		fprintf(stderr, "Couldn't conver time");
+		return NULL;
+	}
+	return currentTime;
 }
 
-void sendToAll(int signal);
-int getPid(int val);
-int getValByPid(int pid) {
-	for (int i = 0; i < CHILD_COUNT; ++i) {
-		if (getPid(i)==pid) {
-			return i;
-		}
-	}
-	return -1;
-};
-
-void printSignalSent(int fromPid, int fromVal, int toPid, int signal, int toVal) {
-	printf("[%lld]  Signal sent from %d(%d) to %d(%d), signal: %d\n", getTime(), fromPid, fromVal, toPid, toVal, signal);
+void parentHandler(int signum, siginfo_t *currHandlerInfo, void *ucontext)
+{
+	char *time = getCurrTime();
+	printf("PARENT: №%d of PID: %d PPID: %d %s recieved SIGUSR2 (from CHILD: %d)\n", messageCount++, getpid(), getppid(), time, currHandlerInfo->si_pid);
+	free(time);
+	usleep(100 * MILISEC);
+	kill(0, SIGUSR1);
 }
 
-void signalHandler(int sig, siginfo_t *siginfo, void *code) {
-	printf("[%lld]  %d(%d) received signal %d from %d(%d)\n", getTime(), getpid(), curNode->val, sig, siginfo->si_pid,
-	       getValByPid(siginfo->si_pid));
-
-	if (sig==SIGUSR1) {
-		usr1_count_rec++;
-	} else if (sig==SIGUSR2) {
-		usr2_count_rec++;
-	} else if (sig==SIGTERM) {
-		printf("[%lld]  %d(%d) received SIGTERM after sent: USR1: %d; USR2: %d;\n",
-		       getTime(),
-		       getpid(),
-		       curNode->val,
-		       usr1_count_snd,
-		       usr2_count_snd);
-		exit(0);
-	}
-
-
-	if (curNode->val==1) {
-		usr2_count_snd++;
-		sleep(1);
-		sendToAll(SIGUSR1);
-	} else {
-		for (int i = 0; i < CHILD_COUNT; ++i) {
-			if (curNode->cn[i]!=NULL) {
-
-				int toVal = curNode->cn[i]->val;
-				int toPid = getPid(toVal);
-				printSignalSent(getpid(), curNode->val, toPid, SIGUSR2, toVal);
-				usr2_count_snd++;
-				if(kill(toPid, SIGUSR2))
-					perror("Can't kill");
-			}
-		}
-	}
+void childHandler(int signum, siginfo_t *currHandlerInfo, void *ucontext)
+{
+	char *time = getCurrTime();
+	printf("№%d of PID: %d PPID: %d %s CHILD\n", messageCount++, getpid(), getppid(), time);
+	free(time);
+	kill(getppid(), SIGUSR2);
 }
 
-void sendToAll(int signal) {
-	__pid_t pgid = getpgid(getpid());
-	printSignalSent(getpid(), curNode->val, (-1)*pgid, signal, -1);
-	if (kill((-1)*pgid, signal))
-		perror("Can't send signal");
-}
-
-Node *createNode(int val, Node *parent, int signal, int signal2) {
-	Node *n = (Node *)malloc(sizeof(Node));
-	n->signal = signal;
-	n->signal2 = signal2;
-	n->val = val;
-	n->sigset = (sigset_t *)malloc(sizeof(sigset_t));
-	for (int i = 0; i < CHILD_COUNT; ++i) {
-		n->cn[i] = NULL;
+int main()
+{
+	struct sigaction sigact, childSigact;
+	sigact.sa_flags = SA_SIGINFO;
+	sigact.sa_sigaction = parentHandler;
+	if (sigaction(SIGUSR2, &sigact, NULL) == -1)
+	{
+		perror("Failed to set handler");
 	}
-	if (parent!=NULL) {
-		char nodeAdded = 0;
-		for (int i = 0; i < CHILD_COUNT; ++i) {
-			if (parent->cn[i]==NULL) {
-				parent->cn[i] = n;
-				nodeAdded = 1;
-				break;
-			}
-		}
-		if (!nodeAdded) {
-			perror("Error: node not added\n");
-		}
-	}
-	return n;
-}
-
-void savePid(int val, int pid) {
-	key_t key = ftok("shmfile", 65);
-	int shmid = shmget(key, 1024, 0666 | IPC_CREAT);
-	int *str = (int *)shmat(shmid, (void *)0, 0);
-
-	str[val] = pid;
-
-	shmdt(str);
-}
-
-int getPid(int val) {
-	key_t key = ftok("shmfile", 65);
-	int shmid = shmget(key, 1024, 0666 | IPC_CREAT);
-	int *str = (int *)shmat(shmid, (void *)0, 0);
-
-	int ret = str[val];
-
-	shmdt(str);
-	return ret;
-}
-
-void createTree(Node *root) {
-	Node *n1 = createNode(1, root, SIGUSR2, 0);
-	Node *n2 = createNode(2, n1, SIGUSR1, 0);
-	Node *n3 = createNode(3, n1, SIGUSR1, 0);
-	n2->cn[0] = n1;
-	n3->cn[0] = n1;
-}
-
-void registerSignalHandler(Node *n) {
-	if (n->signal==-1) return;
-
-	if (sigfillset(n->sigset)) {
-		perror("Error: filling set");
-	}
-	if (n->signal!=0) {
-		if (sigdelset(n->sigset, n->signal)) {
-			perror("Error: deleting set");
-		}
-	}
-	if (n->signal2!=0) {
-		if (sigdelset(n->sigset, n->signal2)) {
-			perror("Error: deleting set");
-		}
-	}
-	if (sigprocmask(SIG_SETMASK, n->sigset, NULL) < 0) {
-		perror("Error: setting signal mask");
+	if (signal(SIGUSR1, SIG_IGN) == SIG_ERR)
+	{
+		perror("Failed to init SIGUSR1");
 	}
 
-	struct sigaction act;
-	memset(&act, 0, sizeof(act));
-	act.sa_sigaction = signalHandler;
-	act.sa_mask = *(n->sigset);
-	act.sa_flags = SA_SIGINFO;
-	if (n->signal && sigaction(n->signal, &act, 0)) {
-		perror("Error: registering signal handler");
-	}
+	pid_t childPid;
+	for (int i = 0; i < CHILD_COUNT; i++)
+	{
+		childPid = fork();
 
-	if (n->signal2 && sigaction(n->signal2, &act, 0)) {
-		perror("Error: registering signal handler");
-	}
-}
-
-pid_t forkProcess(Node *n) {
-	pid_t pid = fork();
-	switch (pid) {
-		case -1: perror("Error: fork failed\n");
-			break;
+		switch (childPid)
+		{
 		case 0:
-			
-			printf("Forked process %d(%d) from %d(%d)\n", getpid(), n->val, getppid(), curNode->val);
-			curNode = n;
-			savePid(curNode->val, getpid());
-			registerSignalHandler(curNode);
-
-			return 0;
-		default:
-			
-			return pid;
-	}
-}
-
-int created[CHILD_COUNT] = {};
-
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "misc-no-recursion"
-void createProcessTree(Node *root) {
-	created[root->val] = 1;
-	curNode = root;
-	for (int i = 0; i < CHILD_COUNT; ++i) {
-		struct Node *nextNode = curNode->cn[i];
-		if (nextNode!=NULL && !created[nextNode->val]) {
-			char semName[255] = "/child_register_handler";
-			size_t strlen1 = strlen(semName);
-			semName[strlen1] = '0' + nextNode->val;
-			semName[strlen1 + 1] = '\0';
-
-			sem_t *childRegisterHandler = sem_open(semName, O_CREAT, 0777, 0);
-			pid_t pid = forkProcess(nextNode);
-
-			if (pid==0) {
-				createProcessTree(curNode);
-				sem_post(childRegisterHandler);
-				printf("Curnode.val: %d\n", curNode->val);
-				if (curNode->val==1) {
-					sendToAll(SIGUSR1);
-				}
-				while (1) { sleep(20000); }
-				printf("Exiting %d\n", curNode->val);
-				exit(0);
-			} else {
-				sem_wait(childRegisterHandler);
-				printf("Process tree for %d created\n", nextNode->val);
-				continue;
+			childSigact.sa_flags = SA_SIGINFO;
+			childSigact.sa_sigaction = childHandler;
+			if (sigaction(SIGUSR1, &childSigact, NULL) == -1)
+			{
+				perror("Failed to set handler");
 			}
+			while (1)
+				sleep(2);
+			break;
+
+		case -1:
+			perror("Error when creating a child process\n");
+			exit(-1);
+		default:
+			break;
 		}
 	}
-}
-#pragma clang diagnostic pop
 
-#define CTRL_F 6
+	kill(0, SIGUSR1);
 
-int main() {
-	Node *root = createNode(0, NULL, 0, 0);
-	registerSignalHandler(root);
-	createTree(root);
-	createProcessTree(root);
-
-
-	while (wait(NULL)!=-1 && getc(stdin) != CTRL_F);
-	return 0;
+	while (1)
+		sleep(2);
 }
