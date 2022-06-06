@@ -41,17 +41,21 @@ void parentHandler(int signum, siginfo_t *currHandlerInfo, void *ucontext)
 {
 	char *time = getCurrTime();
 	printf("PARENT: №%d of PID: %d PPID: %d %s recieved SIGUSR2 (from CHILD: %d)\n", messageCount++, getpid(), getppid(), time, currHandlerInfo->si_pid);
-	free(time);
 	usleep(100 * MILISEC);
-	kill(0, SIGUSR1);
+	kill(0, SIGUSR1);	
+	time = getCurrTime();
+	printf("PARENT: №%d of PID: %d PPID: %d %s put SIGUSR1\n", messageCount++, getpid(), getppid(), time);
+	free(time);
 }
 
 void childHandler(int signum, siginfo_t *currHandlerInfo, void *ucontext)
 {
 	char *time = getCurrTime();
-	printf("№%d of PID: %d PPID: %d %s CHILD\n", messageCount++, getpid(), getppid(), time);
-	free(time);
+	printf("№%d of PID: %d PPID: %d %s CHILD got SIGUSR1\n", messageCount++, getpid(), getppid(), time);
 	kill(getppid(), SIGUSR2);
+	time = getCurrTime();
+	printf("№%d of PID: %d PPID: %d %s CHILD put SIGUSR2\n", messageCount++, getpid(), getppid(), time);
+	free(time);
 }
 
 int main()
