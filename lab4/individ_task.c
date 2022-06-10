@@ -64,16 +64,8 @@ int getValByPid(int pid)
 };
 
 char* getNameOfSignal(int signal) {
-    char sigStr[8];
-    if (signal == SIGUSR1)
-    {
-        strcpy(sigStr, "SIGUSR1");
-    }
-    else if (signal == SIGUSR2)
-    {
-        strcpy(sigStr, "SIGUSR2");
-    }
-    return sigStr;
+    if (signal == SIGUSR1) return "SIGUSR1";
+    else if (signal == SIGUSR2) return "SIGUSR2";
 }
 
 void printSignalSent(int fromPid, int fromVal, int toPid, int signal, int toVal)
