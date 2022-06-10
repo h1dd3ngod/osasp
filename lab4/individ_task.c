@@ -62,8 +62,8 @@ int getValByPid(int pid)
     }
     return -1;
 };
-void printSignalSent(int fromPid, int fromVal, int toPid, int signal, int toVal)
-{
+
+char* getNameOfSignal(int signal) {
     char sigStr[8];
     if (signal == SIGUSR1)
     {
@@ -73,20 +73,16 @@ void printSignalSent(int fromPid, int fromVal, int toPid, int signal, int toVal)
     {
         strcpy(sigStr, "SIGUSR2");
     }
-    printf("Signal sent from %d(value = %d) to %d(value = %d), signal: %s (at %lld)\n", fromPid, fromVal, toPid, toVal, sigStr, getTime());
+    return sigStr;
+}
+
+void printSignalSent(int fromPid, int fromVal, int toPid, int signal, int toVal)
+{
+    printf("Signal sent from %d(value = %d) to %d(value = %d), signal: %s (at %lld)\n", fromPid, fromVal, toPid, toVal, getNameOfSignal(signal), getTime());
 }
 void signalHandler(int sig, siginfo_t *siginfo, void *code)
 {
-    char sigStr[8];
-    if (sig == SIGUSR1)
-    {
-        strcpy(sigStr, "SIGUSR1");
-    }
-    else if (sig == SIGUSR2)
-    {
-        strcpy(sigStr, "SIGUSR2");
-    }
-    printf("%d(%d) received %s from %d(%d) (at %lld)\n", getpid(), curNode->val, sigStr, siginfo->si_pid,
+    printf("%d(%d) received %s from %d(%d) (at %lld)\n", getpid(), curNode->val, getNameOfSignal(sig), siginfo->si_pid,
            getValByPid(siginfo->si_pid), getTime());
 
     if (sig == SIGUSR1)
