@@ -94,7 +94,7 @@ void signalHandler(int sig, siginfo_t *siginfo, void *code)
         strcpy(sigStr, "SIGUSR2");
         SIGUSR2_received++;
     }
-    printf("%d(%d) received %s from %d(%d) (at %lld)\n", getpid(), currNode->val, sigStr, siginfo->si_pid,
+    printf("%d(value = %d) received %s from %d(value = %d) (at %lld)\n", getpid(), currNode->val, sigStr, siginfo->si_pid,
            getValByPid(siginfo->si_pid), getCurrTime());
 
     if (sig == SIGTERM)
@@ -259,7 +259,7 @@ void establishSigHandler(Node *n)
     }
 }
 
-pid_t forkProcess(Node *n)
+pid_t newProc(Node *node)
 {
     pid_t pid = fork();
     switch (pid)
@@ -268,8 +268,8 @@ pid_t forkProcess(Node *n)
         perror("Error: fork failed\n");
         break;
     case 0:
-        printf("Forked process %d(%d) from %d(%d)\n", getpid(), n->val, getppid(), currNode->val);
-        currNode = n;
+        printf("Forked process %d(%d) from %d(%d)\n", getpid(), node->val, getppid(), currNode->val);
+        currNode = node;
         savePid(currNode->val, getpid());
         establishSigHandler(currNode);
 
@@ -281,7 +281,6 @@ pid_t forkProcess(Node *n)
 
 int created[CHILD_COUNT] = {};
 
-// #pragma ide diagnostic ignored "misc-no-recursion"
 void createProcessTree(Node *root)
 {
     created[root->val] = 1;
@@ -301,7 +300,7 @@ void createProcessTree(Node *root)
                 perror("Couldn't create a semaphore\n");
                 // exit(EXIT_FAILURE);
             }
-            pid_t pid = forkProcess(nextNode);
+            pid_t pid = newProc(nextNode);
             if (pid == 0)
             {
                 // for child process
