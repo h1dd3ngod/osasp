@@ -50,12 +50,12 @@ long long getCurrTime()
 }
 
 void sendToAll(int signal);
-int getPid(int val);
+int retrievePid(int val);
 int getValByPid(int pid)
 {
     for (int i = 0; i < CHILD_COUNT; ++i)
     {
-        if (getPid(i) == pid)
+        if (retrievePid(i) == pid)
         {
             return i;
         }
@@ -128,7 +128,7 @@ void signalHandler(int sig, siginfo_t *siginfo, void *code)
             {
 
                 int toVal = currNode->cn[i]->val;
-                int toPid = getPid(toVal);
+                int toPid = retrievePid(toVal);
                 printSignalSent(getpid(), currNode->val, toPid, SIGUSR1, toVal);
                 SIGUSR1_sent++;
                 if (kill(toPid, SIGUSR1))
@@ -188,7 +188,7 @@ void savePid(int val, int pid)
     shmdt(str);
 }
 
-int getPid(int val)
+int retrievePid(int val)
 {
     key_t key = ftok("shmfile", 65);
     int shmid = shmget(key, 1024, 0666 | IPC_CREAT);
