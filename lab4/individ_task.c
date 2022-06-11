@@ -281,8 +281,7 @@ pid_t forkProcess(Node *n)
 
 int created[CHILD_COUNT] = {};
 
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "misc-no-recursion"
+// #pragma ide diagnostic ignored "misc-no-recursion"
 void createProcessTree(Node *root)
 {
     created[root->val] = 1;
@@ -300,7 +299,7 @@ void createProcessTree(Node *root)
             if (childRegisterHandler == SEM_FAILED)
             {
                 perror("Couldn't create a semaphore\n");
-                exit(EXIT_FAILURE);
+                // exit(EXIT_FAILURE);
             }
             pid_t pid = forkProcess(nextNode);
             if (pid == 0)
@@ -330,7 +329,6 @@ void createProcessTree(Node *root)
         }
     }
 }
-#pragma clang diagnostic pop
 
 int main(int argc, char *argv[])
 {
