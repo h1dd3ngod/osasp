@@ -29,13 +29,13 @@ typedef struct Node
 
 char *moduleName;
 
-Node *curNode = NULL;
-int usr1_count_rec = 0;
-int usr2_count_rec = 0;
-int usr1_count_snd = 0;
-int usr2_count_snd = 0;
+Node *currNode = NULL;
+int SIGUSR1_recieved = 0;
+int SIGUSR2_received = 0;
+int SIGUSR1_sent = 0;
+int SIGUSR2_sent = 0;
 
-long long getTime()
+long long getCurrTime()
 {
     struct timeval tv;
 
@@ -63,39 +63,51 @@ int getValByPid(int pid)
     return -1;
 };
 
-char* getNameOfSignal(int signal) {
-    if (signal == SIGUSR1) return "SIGUSR1";
-    else if (signal == SIGUSR2) return "SIGUSR2";
-}
+// char* getNameOfSignal(int signal) {
+//     if (signal == SIGUSR1) return "SIGUSR1";
+//     else if (signal == SIGUSR2) return "SIGUSR2";
+// }
 
 void printSignalSent(int fromPid, int fromVal, int toPid, int signal, int toVal)
 {
-    printf("Signal sent from %d(value = %d) to %d(value = %d), signal: %s (at %lld)\n", fromPid, fromVal, toPid, toVal, getNameOfSignal(signal), getTime());
+    char sigStr[8];
+    if (signal == SIGUSR1)
+    {
+        strcpy(sigStr, "SIGUSR1");
+    }
+    else if (signal == SIGUSR2)
+    {
+        strcpy(sigStr, "SIGUSR2");
+    }
+    printf("Signal sent from %d(value = %d) to %d(value = %d), signal: %s (at %lld)\n", fromPid, fromVal, toPid, toVal, sigStr, getCurrTime());
 }
 void signalHandler(int sig, siginfo_t *siginfo, void *code)
 {
-    printf("%d(%d) received %s from %d(%d) (at %lld)\n", getpid(), curNode->val, getNameOfSignal(sig), siginfo->si_pid,
-           getValByPid(siginfo->si_pid), getTime());
-
+    char sigStr[8];
     if (sig == SIGUSR1)
     {
-        usr1_count_rec++;
+        strcpy(sigStr, "SIGUSR1");
+        SIGUSR1_recieved++;
     }
     else if (sig == SIGUSR2)
     {
-        usr2_count_rec++;
+        strcpy(sigStr, "SIGUSR2");
+        SIGUSR2_received++;
     }
-    else if (sig == SIGTERM)
+    printf("%d(%d) received %s from %d(%d) (at %lld)\n", getpid(), currNode->val, sigStr, siginfo->si_pid,
+           getValByPid(siginfo->si_pid), getCurrTime());
+
+    if (sig == SIGTERM)
     {
-        printf("[%lld]  %d(%d) got TERMINATED after sent: USR1: %d; USR2: %d;\n",
-               getTime(),
+        printf("{%lld}  %d(%d) got TERMINATED after sent: USR1: %d; USR2: %d;\n",
+               getCurrTime(),
                getpid(),
-               curNode->val,
-               usr1_count_snd,
-               usr2_count_snd);
+               currNode->val,
+               SIGUSR1_sent,
+               SIGUSR2_sent);
         exit(0);
     }
-    if (curNode->val == 1 && usr1_count_rec == 101)
+    if (currNode->val == 1 && SIGUSR1_recieved == 101)
     {
         sendToAll(SIGTERM);
         while (wait(NULL) != -1)
@@ -103,22 +115,22 @@ void signalHandler(int sig, siginfo_t *siginfo, void *code)
         exit(0);
     }
 
-    if (curNode->val == 1)
+    if (currNode->val == 1)
     {
-        usr2_count_snd++;
+        SIGUSR2_sent++;
         sendToAll(SIGUSR2);
     }
     else
     {
         for (int i = 0; i < CHILD_COUNT; ++i)
         {
-            if (curNode->cn[i] != NULL)
+            if (currNode->cn[i] != NULL)
             {
 
-                int toVal = curNode->cn[i]->val;
+                int toVal = currNode->cn[i]->val;
                 int toPid = getPid(toVal);
-                printSignalSent(getpid(), curNode->val, toPid, SIGUSR1, toVal);
-                usr2_count_snd++;
+                printSignalSent(getpid(), currNode->val, toPid, SIGUSR1, toVal);
+                SIGUSR1_sent++;
                 if (kill(toPid, SIGUSR1))
                     perror("Can't kill");
             }
@@ -129,7 +141,7 @@ void signalHandler(int sig, siginfo_t *siginfo, void *code)
 void sendToAll(int signal)
 {
     __pid_t pgid = getpgid(getpid());
-    printSignalSent(getpid(), curNode->val, (-1) * pgid, signal, -1);
+    printSignalSent(getpid(), currNode->val, (-1) * pgid, signal, -1);
     if (kill((-1) * pgid, signal))
         perror("Can't send signal");
 }
@@ -256,10 +268,10 @@ pid_t forkProcess(Node *n)
         perror("Error: fork failed\n");
         break;
     case 0:
-        printf("Forked process %d(%d) from %d(%d)\n", getpid(), n->val, getppid(), curNode->val);
-        curNode = n;
-        savePid(curNode->val, getpid());
-        establishSigHandler(curNode);
+        printf("Forked process %d(%d) from %d(%d)\n", getpid(), n->val, getppid(), currNode->val);
+        currNode = n;
+        savePid(currNode->val, getpid());
+        establishSigHandler(currNode);
 
         return 0;
     default:
@@ -274,10 +286,10 @@ int created[CHILD_COUNT] = {};
 void createProcessTree(Node *root)
 {
     created[root->val] = 1;
-    curNode = root;
+    currNode = root;
     for (int i = 0; i < CHILD_COUNT; ++i)
     {
-        struct Node *nextNode = curNode->cn[i];
+        struct Node *nextNode = currNode->cn[i];
         if (nextNode != NULL && !created[nextNode->val])
         {
             char semName[255] = "/child_register_handler";
@@ -285,7 +297,8 @@ void createProcessTree(Node *root)
             semName[strlen1] = '0' + nextNode->val;
             semName[strlen1 + 1] = '\0';
             sem_t *childRegisterHandler = sem_open(semName, O_CREAT, 0777, 0);
-            if (childRegisterHandler == SEM_FAILED) {
+            if (childRegisterHandler == SEM_FAILED)
+            {
                 perror("Couldn't create a semaphore\n");
                 exit(EXIT_FAILURE);
             }
@@ -293,9 +306,9 @@ void createProcessTree(Node *root)
             if (pid == 0)
             {
                 // for child process
-                createProcessTree(curNode);
+                createProcessTree(currNode);
                 sem_post(childRegisterHandler);
-                if (curNode->val == 1)
+                if (currNode->val == 1)
                 {
                     sendToAll(SIGUSR2);
                 }
@@ -303,7 +316,7 @@ void createProcessTree(Node *root)
                 {
                     sleep(20000);
                 }
-                printf("Exiting %d\n", curNode->val);
+                printf("Exiting %d\n", currNode->val);
                 exit(0);
             }
             else
