@@ -200,7 +200,7 @@ int retrievePid(int val)
     return ret;
 }
 
-void createTree(Node *root)
+void initTree(Node *root)
 {
     Node *n1 = newNode(1, root, SIGUSR1, 0);
     Node *n2 = newNode(2, n1, SIGUSR2, SIGTERM);
@@ -337,7 +337,7 @@ int main(int argc, char *argv[])
     // strcpy(moduleName, argv[0]);
     Node *root = newNode(0, NULL, 0, 0);
     establishSigHandler(root);
-    createTree(root);
+    initTree(root);
     createProcessTree(root);
     while (wait(NULL) != -1)
         ;
