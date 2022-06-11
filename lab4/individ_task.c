@@ -21,7 +21,7 @@
 typedef struct Node
 {
     int val;
-    struct Node *cn[CHILD_COUNT];
+    struct Node *children[CHILD_COUNT];
     int signal;  // -1 - no signal
     int signal2; // -1 - no signal
     sigset_t *sigset;
@@ -124,10 +124,10 @@ void signalHandler(int sig, siginfo_t *siginfo, void *code)
     {
         for (int i = 0; i < CHILD_COUNT; ++i)
         {
-            if (currNode->cn[i] != NULL)
+            if (currNode->children[i] != NULL)
             {
 
-                int toVal = currNode->cn[i]->val;
+                int toVal = currNode->children[i]->val;
                 int toPid = retrievePid(toVal);
                 printSignalSent(getpid(), currNode->val, toPid, SIGUSR1, toVal);
                 SIGUSR1_sent++;
@@ -155,16 +155,16 @@ Node *newNode(int val, Node *parent, int signal, int signal2)
     n->sigset = (sigset_t *)malloc(sizeof(sigset_t));
     for (int i = 0; i < CHILD_COUNT; ++i)
     {
-        n->cn[i] = NULL;
+        n->children[i] = NULL;
     }
     if (parent != NULL)
     {
         char nodeAdded = 0;
         for (int i = 0; i < CHILD_COUNT; ++i)
         {
-            if (parent->cn[i] == NULL)
+            if (parent->children[i] == NULL)
             {
-                parent->cn[i] = n;
+                parent->children[i] = n;
                 nodeAdded = 1;
                 break;
             }
@@ -212,7 +212,7 @@ void initTree(Node *root)
 
     newNode(7, n3, SIGUSR1, SIGTERM);
     Node *n8 = newNode(8, n4, SIGUSR1, SIGTERM);
-    n8->cn[0] = n1;
+    n8->children[0] = n1;
 }
 
 void establishSigHandler(Node *n)
@@ -288,7 +288,7 @@ void createProcessTree(Node *root)
     currNode = root;
     for (int i = 0; i < CHILD_COUNT; ++i)
     {
-        struct Node *nextNode = currNode->cn[i];
+        struct Node *nextNode = currNode->children[i];
         if (nextNode != NULL && !created[nextNode->val])
         {
             char semName[255] = "/child_register_handler";
