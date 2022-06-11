@@ -285,6 +285,10 @@ void createProcessTree(Node *root)
             semName[strlen1] = '0' + nextNode->val;
             semName[strlen1 + 1] = '\0';
             sem_t *childRegisterHandler = sem_open(semName, O_CREAT, 0777, 0);
+            if (childRegisterHandler == SEM_FAILED) {
+                perror("Couldn't create a semaphore\n");
+                exit(EXIT_FAILURE);
+            }
             pid_t pid = forkProcess(nextNode);
             if (pid == 0)
             {
